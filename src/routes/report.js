@@ -41,7 +41,7 @@ export async function handleReport(request, app, path) {
     const site = (form.get("site") ?? "").slice(0, 64);
     const ok = await safeEqual(form.get("token") ?? "", env.ADMIN_TOKEN);
     if (!ok) return html(renderLogin(site, "That isn't the admin token."), 401);
-    const target = /^[a-z0-9][a-z0-9-]{0,63}$/.test(site) ? `/r/${site}` : "/r/";
+    const target = /^[a-z0-9][a-z0-9-]{0,31}$/.test(site) ? `/r/${site}` : "/r/";
     return new Response(null, {
       status: 303,
       headers: {

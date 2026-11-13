@@ -143,6 +143,8 @@ export function scannerClass(rawConfig) {
       const c = nextClaimAt(this.sql);
       if (c !== null && c !== undefined) times.push(c);
       times.push(d1((h.housekeepingAt ?? 0) + HOUSEKEEPING_MS));
+      // privacy.json not yet in D1: try again after the D1 backoff, not the hourly poll.
+      if (h.cfgPending) times.push(d1(now + 30_000));
       return Math.max(Math.min(...times), now + 1000);
     }
 
@@ -311,7 +313,9 @@ export function scannerClass(rawConfig) {
           sql: `INSERT INTO sites (id, host, source, own_hosts, pages, settings, every, verify_token, state)
                 SELECT ${v("id")}, ${v("host")}, 'config', ${v("own")}, ${v("pages")}, ${v("settings")}, ${v("every")}, ${v("token")}, 'unverified' FROM json_each(?1) AS j WHERE true
                 ON CONFLICT (id) DO UPDATE SET source = 'config', own_hosts = excluded.own_hosts, pages = excluded.pages, settings = excluded.settings,
-                  every = excluded.every, config_error = NULL,
+                  every = excluded.every,
+                  paused = CASE WHEN sites.config_error = 'removed from privacy.json' THEN 0 ELSE sites.paused END,
+                  config_error = NULL,
                   state = CASE WHEN sites.host != excluded.host THEN 'unverified' ELSE sites.state END,
                   verify_method = CASE WHEN sites.host != excluded.host THEN NULL ELSE sites.verify_method END,
                   verified_scope = CASE WHEN sites.host != excluded.host THEN NULL ELSE sites.verified_scope END,
@@ -358,8 +362,9 @@ export function scannerClass(rawConfig) {
           if (ok) await this.heartbeat(app, h, now, budget);
         } finally {
           h.fp.subrequests += budget.used;
-          this.persist();
+          // Cleared before persisting: a storage error here must never leave every later run skipped.
           this.running = false;
+          this.persist();
         }
       }
       return { ok, next: this.alarmAt, used: budget.used };
@@ -372,6 +377,7 @@ export function scannerClass(rawConfig) {
       if (h.cfgHash !== hash && d1ok()) {
         if (await this.d1(app, h, this.syncStatements(app), budget)) h.cfgHash = hash;
       }
+      h.cfgPending = h.cfgHash !== hash;
       let cur = this.getCursor();
       if (cur && now - cur.startedAt > SCAN_TIMEOUT_MS && cur.stage !== "closing") {
         cur.close = { error: `timed out: not finished within ${SCAN_TIMEOUT_MS / MIN} minutes`, countFail: true };
@@ -409,6 +415,7 @@ export function scannerClass(rawConfig) {
       const due = sites.filter((s) => (s.next_scan_ms ?? 0) <= now).sort((a, b) => (a.next_scan_ms ?? 0) - (b.next_scan_ms ?? 0));
       const pick = manual ? byId.get(manual.site_id) : due[0];
       const future = sites.filter((s) => s !== pick).map((s) => s.next_scan_ms ?? now);
+      if (pick) future.push(now + everySeconds(pick.every) * 1000);
       h.nextScanAt = future.length ? Math.min(...future) : null;
       if (!pick) return null;
       const trigger = manual ? "manual" : "schedule";
@@ -703,8 +710,13 @@ export function scannerClass(rawConfig) {
         // Same-host stylesheets (up to 5): @import and @font-face on third-party hosts.
         for (const css of cur.stylesheets.slice(0, 5)) {
           const c = checkUrl(css.url);
-          if (!c.ok || !inScope(c.host, cur.scope) || left(budget) < 1 + COST.dns + COST.reserve) continue;
+          if (!c.ok || !inScope(c.host, cur.scope)) continue;
+          if (left(budget) < 1 + COST.dns + COST.reserve) {
+            cur.cssIncomplete = true;
+            continue;
+          }
           const r = await safeFetch(css.url, ctx, { follow: 0, maxBytes: 512 * 1024 });
+          if (!r.ok) cur.cssIncomplete = true;
           if (r.ok && r.status >= 200 && r.status < 300) cur.findings.push(...cssFindings(new TextDecoder().decode(r.body), css.url, { page: css.page, own: ownSet(site) }));
         }
         cur.policyDone = true;
@@ -756,7 +768,9 @@ export function scannerClass(rawConfig) {
       const carryChecks = new Set(cur.carryChecks);
       for (const t of tracked.values()) {
         if (have.has(t.key) || (t.missing ?? 0) > 0) continue;
-        if (carryPages.has(t.page) || carryChecks.has(t.check)) list.push({ ...t, carried: true });
+        // A stylesheet that couldn't be read keeps the findings it gave before ("via <css path>").
+        const cssCarry = cur.cssIncomplete && String(t.evidence ?? "").startsWith("via ");
+        if (carryPages.has(t.page) || carryChecks.has(t.check) || cssCarry) list.push({ ...t, carried: true });
       }
       list = list.slice(0, MAX_FINDINGS_SCAN);
       const d = diffScan(tracked, list, status, now);
@@ -874,7 +888,10 @@ export function scannerClass(rawConfig) {
 
     async sendAlerts(app, h, now, budget) {
       const limit = left(budget) - 2;
-      if (limit > 0) await sendDue(this.sql, this.env, now, limit);
+      if (limit > 0) {
+        const r = await sendDue(this.sql, this.env, now, limit);
+        spend(budget, r.tried);
+      }
       const s = syncStatement(this.sql);
       if (s.stmt && !((h.d1RetryAt ?? 0) > now) && (await this.d1(app, h, [s.stmt], budget))) markSynced(this.sql, s.keys);
     }
