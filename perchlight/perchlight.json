@@ -1,0 +1,82 @@
+{
+  "$schema": "https://perchlight.ravenburst.com/schema/v1.json",
+  "version": 1,
+  "views": [
+    {
+      "id": "privacy-sites",
+      "title": "Sites",
+      "source": { "type": "d1", "database": "YOUR-D1-DATABASE-ID", "table": "sites" },
+      "columns": [
+        { "label": "Site", "from": "id" },
+        { "label": "Host", "from": "host" },
+        { "label": "State", "from": "state", "type": "enum", "options": ["unverified", "active", "verification_lost"] },
+        { "label": "Paused", "from": "paused", "type": "boolean", "editable": true },
+        { "label": "Every (min 6h)", "from": "every", "editable": true },
+        { "label": "Verified by", "from": "verify_method", "type": "enum", "options": ["txt", "file"] },
+        { "label": "Covers", "from": "verified_name" },
+        { "label": "Last scan (UTC)", "from": "last_scan_at", "type": "date" },
+        { "label": "Last status", "from": "last_status", "type": "enum", "options": ["done", "partial", "failed"] },
+        { "label": "Next scan (UTC)", "from": "next_scan_at", "type": "date" },
+        { "label": "High", "from": "high", "type": "number" },
+        { "label": "Medium", "from": "medium", "type": "number" },
+        { "label": "Source", "from": "source", "type": "enum", "options": ["config", "api"] },
+        { "label": "Config error", "from": "config_error", "hidden": true }
+      ]
+    },
+    {
+      "id": "privacy-scans",
+      "title": "Scans",
+      "source": { "type": "d1", "database": "YOUR-D1-DATABASE-ID", "table": "scans" },
+      "columns": [
+        { "label": "Site", "from": "site_id" },
+        { "label": "Started (UTC)", "from": "started_at", "type": "date" },
+        { "label": "Status", "from": "status", "type": "enum", "options": ["running", "done", "partial", "failed"] },
+        { "label": "Trigger", "from": "trigger", "type": "enum", "options": ["schedule", "manual"] },
+        { "label": "Pages OK", "from": "pages_ok", "type": "number" },
+        { "label": "Pages failed", "from": "pages_failed", "type": "number" },
+        { "label": "High", "from": "high", "type": "number" },
+        { "label": "Medium", "from": "medium", "type": "number" },
+        { "label": "Low", "from": "low", "type": "number" },
+        { "label": "New", "from": "new_count", "type": "number" },
+        { "label": "Resolved", "from": "resolved_count", "type": "number" },
+        { "label": "Error", "from": "error" },
+        { "label": "Subrequests", "from": "subrequests", "type": "number", "hidden": true },
+        { "label": "Id", "from": "id", "hidden": true }
+      ]
+    },
+    {
+      "id": "privacy-findings",
+      "title": "Findings (latest scan)",
+      "source": { "type": "d1", "database": "YOUR-D1-DATABASE-ID", "table": "latest_findings" },
+      "columns": [
+        { "label": "Site", "from": "site_id" },
+        { "label": "Severity", "from": "severity", "type": "enum", "options": ["high", "medium", "low", "info"] },
+        { "label": "Rank", "from": "severity_rank", "type": "number", "hidden": true },
+        { "label": "Check", "from": "check_id" },
+        { "label": "Page", "from": "page" },
+        { "label": "Subject", "from": "subject" },
+        { "label": "Evidence", "from": "evidence" },
+        { "label": "First seen (UTC)", "from": "first_seen_at", "type": "date" },
+        { "label": "Muted", "from": "muted", "type": "boolean" },
+        { "label": "Carried forward", "from": "carried", "type": "boolean", "hidden": true },
+        { "label": "Key (for POST /api/findings/:key/mute)", "from": "key", "hidden": true }
+      ]
+    },
+    {
+      "id": "privacy-alerts",
+      "title": "Alerts",
+      "source": { "type": "d1", "database": "YOUR-D1-DATABASE-ID", "table": "deliveries" },
+      "columns": [
+        { "label": "Kind", "from": "kind", "type": "enum", "options": ["changes", "verification_lost", "scan_failing", "recovered", "test"] },
+        { "label": "Channel", "from": "channel" },
+        { "label": "Status", "from": "status", "type": "enum", "options": ["pending", "sending", "retry", "sent", "failed", "unknown", "retry_requested"] },
+        { "label": "Attempts", "from": "attempts", "type": "number" },
+        { "label": "Last error", "from": "last_error" },
+        { "label": "Created (UTC)", "from": "created_at", "type": "date" },
+        { "label": "Sent (UTC)", "from": "sent_at", "type": "date" },
+        { "label": "Subject", "from": "subject", "hidden": true }
+      ],
+      "actions": [{ "label": "Try again", "set": { "status": "retry_requested" } }]
+    }
+  ]
+}

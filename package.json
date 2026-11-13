@@ -1,0 +1,37 @@
+{
+  "name": "perchlight-privacy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A free, self-hosted privacy and compliance checker for websites you own, on Cloudflare Workers + D1 + one small Durable Object. Static checks only; no cron trigger. Not legal advice.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "cloudflare": {
+    "bindings": {
+      "ADMIN_TOKEN": {
+        "description": "Required. A long random string (16+ characters), e.g. from `openssl rand -hex 32`. Protects the admin API (/api/*) and the report pages."
+      },
+      "ALERT_WEBHOOKS": {
+        "description": "Optional. JSON: webhook name to URL, e.g. {\"discord-ops\":\"https://discord.com/api/webhooks/...\"}. Names are listed in privacy.json alerts.webhooks. A secret: a webhook URL is a credential."
+      },
+      "WEBHOOK_SECRET": {
+        "description": "Needed for JSON alert webhooks. 16+ random characters: JSON alerts are signed with HMAC-SHA256 of it."
+      },
+      "HEARTBEAT_URL": {
+        "description": "Optional. An https URL fetched after Scanner runs (at most every 5 minutes), for example a perchlight-hooks or healthchecks.io heartbeat, so you hear about it if this tool stops."
+      }
+    }
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.6.1",
+    "vitest": "^5.1.0",
+    "wrangler": "^4.159.0"
+  }
+}

@@ -1,0 +1,47 @@
+// perchlight-privacy: one Worker + D1 + one small Durable Object (Scanner).
+// Secrets are never set here. Locally they go in .dev.vars (see .dev.vars.example);
+// in production: npx wrangler secret put <NAME>
+// Your own copy with a real database_id can live in wrangler.mine.jsonc (gitignored):
+//   npx wrangler deploy -c wrangler.mine.jsonc
+//
+// No cron trigger, on purpose (the account's 5 are used by other Perchlight
+// tools): scans, chunks, alert retries and housekeeping are all timed by the
+// Scanner Durable Object's alarm, which any API request or GET /tick re-arms
+// if it ever stops (docs/SDD.md, "Scanning").
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "perchlight-privacy",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-01",
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "perchlight-privacy",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Alerts to your own verified addresses (Email Routing > Destination
+  // addresses). Free on all plans.
+  "send_email": [{ "name": "EMAIL" }],
+
+  // Durable Objects on the Free plan need the SQLite backend. One instance, "scanner".
+  "durable_objects": {
+    "bindings": [{ "name": "SCANNER", "class_name": "Scanner" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Scanner"] }],
+
+  "vars": {
+    // This deployment's public URL, e.g. https://perchlight-privacy.you.workers.dev
+    // (used for report links in alerts and share links). Empty = the request's origin.
+    "PUBLIC_URL": "",
+    // An address on a domain with Email Routing on. Alerts come from it.
+    "MAIL_FROM": ""
+  }
+
+  // Your own domain, once it works on workers.dev. A site served by another
+  // Worker on the same zone may need a service binding (docs/SDD.md, "Edge cases");
+  // workers.dev is the recommended home for this tool.
+  // "routes": [{ "pattern": "privacy.example.com", "custom_domain": true }]
+}

@@ -1,0 +1,16 @@
+# Copy to .dev.vars for local development (`npm run dev`). Never commit .dev.vars.
+# In production, set each one with:  npx wrangler secret put <NAME>
+
+# Required. 16+ random characters (openssl rand -hex 32). Protects /api/* and the report pages.
+ADMIN_TOKEN=
+
+# Optional. Webhook names (listed in privacy.json alerts.webhooks) to URLs. A secret.
+# ALERT_WEBHOOKS={"discord-ops":"https://discord.com/api/webhooks/...","ntfy-phone":{"url":"https://ntfy.sh/your-topic","token":"tk_..."}}
+ALERT_WEBHOOKS=
+
+# Needed for JSON alert webhooks: 16+ random characters; bodies are signed with HMAC-SHA256.
+WEBHOOK_SECRET=
+
+# Optional. An https URL fetched after Scanner runs (at most every 5 minutes),
+# e.g. a perchlight-hooks heartbeat ping URL or a healthchecks.io check.
+# HEARTBEAT_URL=

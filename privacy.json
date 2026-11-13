@@ -1,0 +1,5 @@
+{
+  "sites": {},
+  "alerts": { "email": [], "webhooks": [] },
+  "retention": { "scansPerSite": 30 }
+}
